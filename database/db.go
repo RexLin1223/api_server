@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	// Driver of SQL
@@ -10,21 +11,21 @@ import (
 
 // ConnectionInfo is detail info of remote database
 type ConnectionInfo struct {
-	address  string
-	port     string
-	username string
-	password string
-	dbName   string
+	Domain     string
+	Port       string
+	Username   string
+	Password   string
+	TargetName string // Database name
 }
 
 // NewConnectionInfo is factor pattern of ConnectionInfo
-func NewConnectionInfo(address string, port string, username string, password string, dbName string) *ConnectionInfo {
+func NewConnectionInfo(domain string, port string, username string, password string, dbName string) *ConnectionInfo {
 	return &ConnectionInfo{
-		address:  address,
-		port:     port,
-		username: username,
-		password: password,
-		dbName:   dbName,
+		Domain:     domain,
+		Port:       port,
+		Username:   username,
+		Password:   password,
+		TargetName: dbName,
 	}
 }
 
@@ -63,7 +64,7 @@ func NewMySQLLConnector(info *ConnectionInfo) ISQLConnector {
 
 // Open connection with remote database
 func (conn *MySQLConnectorImpl) Open() error {
-	command := conn.info.username + ":" + conn.info.password + "@tcp(" + conn.info.address + ":" + conn.info.port + ")/" + conn.info.dbName
+	command := conn.info.Username + ":" + conn.info.Password + "@tcp(" + conn.info.Domain + ":" + conn.info.Port + ")/" + conn.info.TargetName
 	db, err := sql.Open("mysql", command)
 	if err != nil {
 		return err
@@ -83,8 +84,8 @@ func (conn *MySQLConnectorImpl) Close() error {
 	return nil
 }
 
-// Create will insert data into particular table()
-func (conn *MySQLConnectorImpl) Create(table string, params map[string]interface{}) error {
+// CheckAndReopen function will check connection status with DB and reopen when connection is offline
+func (conn *MySQLConnectorImpl) CheckAndReopen() error {
 	if conn.db != nil {
 		err := conn.db.Ping()
 		if err != nil {
@@ -96,15 +97,61 @@ func (conn *MySQLConnectorImpl) Create(table string, params map[string]interface
 			return err
 		}
 	}
+	return nil
+}
+
+// Create will insert data into particular table()
+func (conn *MySQLConnectorImpl) Create(table string, params map[string]interface{}) error {
+	err := conn.CheckAndReopen()
+	if err != nil {
+		return err
+	}
+	if len(params) == 0 {
+		return errors.New("Empty data for insert manipulation")
+	}
 
 	// Format  create command
+	// Columns name
+	columns := "("
+	// Insertion values
+	values := "("
+	for key, value := range params {
+		columns += key + ", "
+		values += value.(string) + ", "
+	}
+	columns = columns[:len(columns)-2]
+	values = columns[:len(columns)-2]
+	columns += ")"
+	values += ")"
+
+	command := fmt.Sprintf("INSERT INTO %s %s VALUES %s", table, columns, values)
+	result, err := conn.db.Exec(command)
+	if err != nil {
+		return err
+	}
+
+	insertID, err := result.LastInsertId()
+	if err != nil {
+		return err
+	} else if insertID == 0 {
+		return errors.New("Insert data failed")
+	}
 
 	return nil
 }
 
-// Read function will send select command for find target data matches {constraint} from particular {table}
+// Read function will send select command to find target data matches {constraint} from particular {table}
 func (conn *MySQLConnectorImpl) Read(table string, constraint string) (map[string]interface{}, error) {
-	command := "SELTECT * FROM " + conn.info.dbName + "." + table
+	err := conn.CheckAndReopen()
+	if err != nil {
+		return nil, err
+	}
+
+	command := fmt.Sprintf("SELECT * FROM %s.%s", conn.info.TargetName, table)
+	if len(constraint) > 0 {
+		command += " " + constraint
+	}
+	fmt.Println("Query Command: " + command)
 	rows, err := conn.db.Query(command)
 	if err != nil {
 		return nil, err
@@ -112,7 +159,7 @@ func (conn *MySQLConnectorImpl) Read(table string, constraint string) (map[strin
 	// Get column names
 	columns, err := rows.Columns()
 	if err != nil {
-		panic(err.Error()) // proper error handling instead of panic in your app
+		return nil, err
 	}
 
 	// Make a slice for the values
@@ -126,12 +173,13 @@ func (conn *MySQLConnectorImpl) Read(table string, constraint string) (map[strin
 		scanArgs[i] = &values[i]
 	}
 
+	output := make(map[string]interface{})
 	// Fetch rows
 	for rows.Next() {
 		// get RawBytes from data
 		err = rows.Scan(scanArgs...)
 		if err != nil {
-			panic(err.Error()) // proper error handling instead of panic in your app
+			return nil, err
 		}
 
 		// Now do something with the data.
@@ -144,14 +192,12 @@ func (conn *MySQLConnectorImpl) Read(table string, constraint string) (map[strin
 			} else {
 				value = string(col)
 			}
+			output[columns[i]] = value
 			fmt.Println(columns[i], ": ", value)
 		}
 		fmt.Println("-----------------------------------")
 	}
-	if err = rows.Err(); err != nil {
-		panic(err.Error()) // proper error handling instead of panic in your app
-	}
-	return nil, nil
+	return output, nil
 }
 
 // Update function will send select command for find target data out from particular {table}
