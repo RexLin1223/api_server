@@ -10,11 +10,11 @@ type CustomizedConfig struct {
 
 // DatabaseInfo represents router of some route
 type DatabaseInfo struct {
-	Domain   string
-	Port     string
-	User     string
-	Password string
-	Name     string
+	Domain     string
+	Port       string
+	User       string
+	Password   string
+	TargetName string
 }
 
 // RouteRule is customized route
@@ -36,11 +36,11 @@ func Load() *CustomizedConfig {
 			Authorize: "/auth",
 		},
 		DBInfo: DatabaseInfo{
-			Domain:   "172.16.10.18",
-			Port:     "3306",
-			User:     "remote_root",
-			Password: "Aa123456",
-			Name:     "dagogo",
+			Domain:     "172.16.10.18",
+			Port:       "3306",
+			User:       "remote_root",
+			Password:   "Aa123456",
+			TargetName: "dagogo",
 		},
 	}
 	return &conf

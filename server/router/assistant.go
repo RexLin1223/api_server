@@ -1,21 +1,16 @@
 package router
 
 import (
-	"api/server/authentication"
-	"api/server/config"
+	"api/server/verification"
 	"log"
 	"net/http"
 )
 
 // AssistantHandler is entry of request with URL as "/assistant"
 func AssistantHandler(w http.ResponseWriter, r *http.Request) {
-	serverConf := config.Load()
+	//serverConf := config.Load()
 
-	auth := authentication.NewAuthenticator()
-	auth.SetHost(serverConf.DBInfo.Domain, serverConf.DBInfo.Port).
-		SetAuthentication(serverConf.DBInfo.User, serverConf.DBInfo.Password).
-		SetDatabase(serverConf.DBInfo.Name)
-
+	auth := verification.NewAuthenticator()
 	err := auth.VerifyToken(r.Header.Get("Authorization"))
 	if err != nil {
 		log.Println(err)

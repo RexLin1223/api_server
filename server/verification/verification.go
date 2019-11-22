@@ -1,14 +1,14 @@
-package authentication
+package verification
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	"api/database"
+	"api/server/config"
 	"api/server/protocol"
 
 	"github.com/robbert229/jwt"
@@ -22,13 +22,14 @@ type Authenticator struct {
 
 // NewAuthenticator function will create an Authenticator
 func NewAuthenticator() *Authenticator {
+	serverConfig := config.Load()
 	return &Authenticator{
 		dbInfo: database.ConnectionInfo{
-			Domain:     "127.0.0.1",
-			Port:       "3306",
-			Username:   "root",
-			Password:   "",
-			TargetName: "",
+			Domain:     serverConfig.DBInfo.Domain,
+			Port:       serverConfig.DBInfo.Port,
+			Username:   serverConfig.DBInfo.User,
+			Password:   serverConfig.DBInfo.Password,
+			TargetName: serverConfig.DBInfo.TargetName,
 		},
 		expiredTime: 600, // Defualt value
 	}
@@ -37,26 +38,6 @@ func NewAuthenticator() *Authenticator {
 // SetExpiredTime will rewrite expired time into authenticator
 func (auth *Authenticator) SetExpiredTime(expiredTime int64) *Authenticator {
 	auth.expiredTime = expiredTime
-	return auth
-}
-
-// SetHost will rewrite new domain and port into authenticator
-func (auth *Authenticator) SetHost(domain string, port string) *Authenticator {
-	auth.dbInfo.Domain = domain
-	auth.dbInfo.Port = port
-	return auth
-}
-
-// SetAuthentication will rewrite {username} and {password} into authenticator
-func (auth *Authenticator) SetAuthentication(username string, password string) *Authenticator {
-	auth.dbInfo.Username = username
-	auth.dbInfo.Password = password
-	return auth
-}
-
-// SetDatabase will rewrite {databaseName} into authenticator
-func (auth *Authenticator) SetDatabase(databaseName string) *Authenticator {
-	auth.dbInfo.TargetName = databaseName
 	return auth
 }
 
@@ -75,14 +56,15 @@ func (auth *Authenticator) GenerateToken(url string, username string, password s
 	result, err := connector.Read("user_member", sqlCommand)
 	if err != nil {
 		return "", err
-	}
-	if len(result) == 0 {
-		return "", errors.New("Empty query")
+	} else if len(result) == 0 {
+		return "", errors.New("Username or Password incorrectly")
+	} else if len(result) > 1 {
+		return "", errors.New("Multi-role in database")
 	}
 
 	// Stuff user claims here
 	params := make(map[string]interface{})
-	params["role"] = result["role"].(string)
+	params["role"] = result[0]["role"].(string)
 	params["exp"] = time.Now().Unix() + auth.expiredTime
 
 	jwt, err := generateJWT(params)
@@ -100,7 +82,10 @@ func (auth *Authenticator) VerifyToken(authorization string) error {
 	return validateJWT(authorization[7:])
 }
 
+var secret = `D!a@g#o$g%o^S(e)c_r+e!t@`
+
 func generateReponseJSON(token string) string {
+	// Formating token to JSON
 	resp := protocol.TokenResponse{
 		Result:  "Successful",
 		Message: "JWT",
@@ -115,22 +100,18 @@ func generateReponseJSON(token string) string {
 	return string(result)
 }
 
-var secret = "DagogoSecret"
-
 func generateJWT(params map[string]interface{}) (string, error) {
 	alg := jwt.HmacSha256(secret)
 
+	// User defined payload
 	claims := jwt.NewClaim()
-	// User define payload
-
 	for key, value := range params {
 		claims.Set(key, value)
 	}
 
 	token, err := alg.Encode(claims)
 	if err != nil {
-		log.Fatal(err)
-		return "", errors.New("Encode failed")
+		return "", err
 	}
 
 	return token, nil

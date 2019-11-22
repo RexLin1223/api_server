@@ -38,10 +38,10 @@ type ISQLConnector interface {
 	Create(string, map[string]interface{}) error
 
 	//  Read(table string, constraint string)
-	Read(string, string) (map[string]interface{}, error)
+	Read(string, string) ([]map[string]interface{}, error)
 
 	// Update function will send select command for find target data out from particular {table}
-	Update(string, string, interface{}) error
+	Update(string, map[string]interface{}, string) error
 
 	// Delete function will send delete command for remove some target matches {constraint}
 	Delete(string, string) error
@@ -60,6 +60,11 @@ func NewMySQLLConnector(info *ConnectionInfo) ISQLConnector {
 		db:   nil,
 	}
 	return conn
+}
+
+// SetInfo as connection info
+func (conn *MySQLConnectorImpl) SetInfo(info *ConnectionInfo) {
+	conn.info = info
 }
 
 // Open connection with remote database
@@ -106,25 +111,29 @@ func (conn *MySQLConnectorImpl) Create(table string, params map[string]interface
 	if err != nil {
 		return err
 	}
+	defer conn.db.Close()
+
 	if len(params) == 0 {
 		return errors.New("Empty data for insert manipulation")
 	}
 
 	// Format  create command
-	// Columns name
-	columns := "("
-	// Insertion values
-	values := "("
+	var columns, values string
 	for key, value := range params {
-		columns += key + ", "
-		values += value.(string) + ", "
-	}
-	columns = columns[:len(columns)-2]
-	values = columns[:len(columns)-2]
-	columns += ")"
-	values += ")"
+		if len(columns) > 0 {
+			columns += ", "
+		}
+		columns += key
 
-	command := fmt.Sprintf("INSERT INTO %s %s VALUES %s", table, columns, values)
+		if len(values) > 0 {
+			values += ", "
+		}
+		values += fmt.Sprintf(`'%s'`, value.(string))
+	}
+
+	command := fmt.Sprintf("INSERT INTO %s.%s (%s) VALUES (%s)", conn.info.TargetName, table, columns, values)
+	fmt.Println("INSERT comamnd: " + command)
+
 	result, err := conn.db.Exec(command)
 	if err != nil {
 		return err
@@ -133,7 +142,7 @@ func (conn *MySQLConnectorImpl) Create(table string, params map[string]interface
 	insertID, err := result.LastInsertId()
 	if err != nil {
 		return err
-	} else if insertID == 0 {
+	} else if insertID != 0 {
 		return errors.New("Insert data failed")
 	}
 
@@ -141,11 +150,12 @@ func (conn *MySQLConnectorImpl) Create(table string, params map[string]interface
 }
 
 // Read function will send select command to find target data matches {constraint} from particular {table}
-func (conn *MySQLConnectorImpl) Read(table string, constraint string) (map[string]interface{}, error) {
+func (conn *MySQLConnectorImpl) Read(table string, constraint string) ([]map[string]interface{}, error) {
 	err := conn.CheckAndReopen()
 	if err != nil {
 		return nil, err
 	}
+	defer conn.db.Close()
 
 	command := fmt.Sprintf("SELECT * FROM %s.%s", conn.info.TargetName, table)
 	if len(constraint) > 0 {
@@ -156,12 +166,13 @@ func (conn *MySQLConnectorImpl) Read(table string, constraint string) (map[strin
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+
 	// Get column names
 	columns, err := rows.Columns()
 	if err != nil {
 		return nil, err
 	}
-
 	// Make a slice for the values
 	values := make([]sql.RawBytes, len(columns))
 
@@ -173,9 +184,9 @@ func (conn *MySQLConnectorImpl) Read(table string, constraint string) (map[strin
 		scanArgs[i] = &values[i]
 	}
 
-	output := make(map[string]interface{})
+	output := make([]map[string]interface{}, 0)
 	// Fetch rows
-	for rows.Next() {
+	for ri := 0; rows.Next(); ri++ {
 		// get RawBytes from data
 		err = rows.Scan(scanArgs...)
 		if err != nil {
@@ -184,30 +195,82 @@ func (conn *MySQLConnectorImpl) Read(table string, constraint string) (map[strin
 
 		// Now do something with the data.
 		// Here we just print each column as a string.
+		m := make(map[string]interface{})
 		var value string
-		for i, col := range values {
+		for ci, col := range values {
 			// Here we can check if the value is nil (NULL value)
 			if col == nil {
 				value = "NULL"
 			} else {
 				value = string(col)
 			}
-			output[columns[i]] = value
-			fmt.Println(columns[i], ": ", value)
+
+			m[columns[ci]] = value
+			fmt.Println(columns[ci], ": ", value)
 		}
 		fmt.Println("-----------------------------------")
+
+		// Renew a slice, copy exist elemnets, and append a new element
+		output = append(output, m)
 	}
 	return output, nil
 }
 
 // Update function will send select command for find target data out from particular {table}
-func (conn *MySQLConnectorImpl) Update(table string, constraint string, newValue interface{}) error {
+func (conn *MySQLConnectorImpl) Update(table string, params map[string]interface{}, constraint string) error {
+	err := conn.CheckAndReopen()
+	if err != nil {
+		return err
+	}
+	defer conn.db.Close()
+
+	var values string
+	for key, value := range params {
+		if len(values) > 0 {
+			values += ", "
+		}
+		values += fmt.Sprintf(`%s='%s'`, key, value.(string))
+	}
+	command := fmt.Sprintf("UPDATE %s.%s SET %s WHERE %s", conn.info.TargetName, table, values, constraint)
+	fmt.Println("Update comamnd: " + command)
+
+	result, err := conn.db.Exec(command)
+	if err != nil {
+		return err
+	}
+
+	insertID, err := result.LastInsertId()
+	if err != nil {
+		return err
+	} else if insertID != 0 {
+		return errors.New("Update data failed")
+	}
 
 	return nil
 }
 
 // Delete function will send delete command for remove some target matches {constraint}
 func (conn *MySQLConnectorImpl) Delete(table string, constraint string) error {
+	err := conn.CheckAndReopen()
+	if err != nil {
+		return err
+	}
+	defer conn.db.Close()
+
+	command := fmt.Sprintf("DELETE FROM %s.%s WHERE %s", conn.info.TargetName, table, constraint)
+	fmt.Println("Delete comamnd: " + command)
+
+	result, err := conn.db.Exec(command)
+	if err != nil {
+		return err
+	}
+
+	insertID, err := result.LastInsertId()
+	if err != nil {
+		return err
+	} else if insertID != 0 {
+		return errors.New("Delete data failed")
+	}
 
 	return nil
 }
