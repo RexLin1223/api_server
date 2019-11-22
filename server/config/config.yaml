@@ -1,0 +1,33 @@
+api-server:
+    version: 1.0.0.1
+    config:
+        - domain: "0.0.0.0"
+        - port: "3064"
+    database-info: 
+        - address: "127.0.0.1"
+        - port: "3306"
+        - username: "root"
+        - password: "123456"
+    api-define:
+        - home: "/home"
+        - admin: "/admin"
+        - member: "/member"
+        - assistant: "/assistant"
+        - Authorize: "/auth"
+    table-permission:
+        - create
+            - admin: "user_member, user_assistant, order_list"
+            - member: "user_member, order_list"
+            - assistant: "user_assistant, order_list"
+        - read
+            - admin: "user_member, user_assistant, order_list"
+            - member: "user_member, user_assistant, order_list"
+            - assistant: "user_assistant, user_member, order_list"
+        - update
+            - admin: "user_member, user_assistant, order_list"
+            - member: "user_member, order_list"
+            - assistant: "user_assistant, order_list"
+        - delete
+            - admin: "user_member, user_assistant, order_list"
+            - member: ""
+            - assistant: ""
