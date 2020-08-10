@@ -37,4 +37,6 @@ See [JWT Library](https://github.com/robbert229/jwt)
 - DELETE
   - Use DELETE method to remove exist data in database
   - How to delete data?
-  
+ 
+# License
+MIT
