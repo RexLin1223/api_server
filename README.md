@@ -29,7 +29,7 @@ See [JWT Library](https://github.com/robbert229/jwt).
   - How to query data?
     - Use GET method.
     - The URL as ``` https://127.0.0.1:8080/admin/{table_name}/{constraint} ```
-    - Client need provide {table_name} and {constraint} in URL to query specific data.
+    - Client needs provide {table_name} and {constraint} in URL to query specific data.
   
 - POST
   - Use PUT method to insert a new data into database.
@@ -37,7 +37,7 @@ See [JWT Library](https://github.com/robbert229/jwt).
     - Use POST method.
     - URL: ``` https://127.0.0.1:8080/admin/{table_name}/```
     - Payload as {new_data}: ``` { "name":"Rex", "gender":"male", "title":"software engineer" } ```
-    - Client need provide {table_name} in URL and {new_data} in payload to insert new data.
+    - Client needs provide {table_name} in URL and {new_data} in payload to insert new data.
 
 - PUT
   - Use PUT method to update exist data in database.
@@ -45,7 +45,7 @@ See [JWT Library](https://github.com/robbert229/jwt).
     - Use PUT method.
     - URL: ``` https://127.0.0.1:8080/admin/{table_name}/{constraint}```
     - Payload as {update_data}: ``` { "title":"senior software engineer" } ```
-    - Client need provide {table_name} and {update_data} in payload to update specific data.
+    - Client needs provide {table_name} and {update_data} in payload to update specific data.
 
 
 - DELETE
@@ -53,7 +53,7 @@ See [JWT Library](https://github.com/robbert229/jwt).
   - How to delete data?
       - Use DELETE method.
       - The URL as ``` https://127.0.0.1:8080/admin/{table_name}/{constraint} ```
-      - Client need provide {table_name} and {constraint} in URL to delete specific data.
+      - Client needs provide {table_name} and {constraint} in URL to delete specific data.
  
 # License
 MIT
