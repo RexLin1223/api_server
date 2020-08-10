@@ -2,7 +2,7 @@
 # Description
 This project is a simple database controller which manipalation CRUD command to SQL Server.
 
-We only implement MySQL now, or you can change any SQL driver for another SQL database.
+In currently, we only implement MySQL, or you can change SQL driver for any SQL database you need.
 
 # Dependency Library
 We are using Gorilla mux to be HTTP request router.
