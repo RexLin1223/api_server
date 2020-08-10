@@ -1,5 +1,4 @@
-# Simple Mysql Database Operator
-# network_lib
+# Simple MySQL Database Controller
 # Description
 This project is a simple database controller which manipalation CRUD command to MySQL.
 
