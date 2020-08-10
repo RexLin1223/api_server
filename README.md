@@ -1,4 +1,4 @@
-# Simple MySQL Database Controller
+# Simple SQL Database Controller
 # Description
 This project is a simple database controller which manipalation CRUD command to MySQL.
 
